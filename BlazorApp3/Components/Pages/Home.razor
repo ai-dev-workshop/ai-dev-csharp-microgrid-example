@@ -1,0 +1,128 @@
+﻿@page "/"
+@using BlazorApp3.Services
+@using BlazorApp3.Data.Models
+@inject IStatsService StatsService
+@rendermode InteractiveServer
+
+<PageTitle>EcoGrid Dashboard</PageTitle>
+
+<div class="container mt-4">
+    <h2 class="mb-4">Energy Dashboard</h2>
+
+    <div class="row g-4 mb-4">
+        <!-- Production Card -->
+        <div class="col-md-3">
+            <div class="card h-100 border-success shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-success">Solar Generation</h5>
+                    <p class="h3 py-2">@(_production.ToString("N2")) kW</p>
+                    <small class="text-muted">Today's Peak</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Consumption Card -->
+        <div class="col-md-3">
+            <div class="card h-100 border-danger shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-danger">Grid Usage</h5>
+                    <p class="h3 py-2">@(_consumption.ToString("N2")) kW</p>
+                    <small class="text-muted">Current Load</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Efficiency Card -->
+        <div class="col-md-3">
+            <div class="card h-100 border-info shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-info">Renewable Score</h5>
+                    <p class="h3 py-2">@(_efficiency.ToString("N0"))%</p>
+                    <div class="progress mt-2" style="height: 10px;">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: @(_efficiency)%" 
+                             aria-valuenow="@(_efficiency)" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Consumer Card -->
+        <div class="col-md-3">
+            <div class="card h-100 border-warning shadow-sm">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-warning">Top Consumer</h5>
+                    <p class="h4 py-2 text-truncate">@(_topConsumer?.Name ?? "N/A")</p>
+                    <small class="text-muted">High consumption alert</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Recent Meter Readings</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Asset</th>
+                                <th>Value (kW)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_recentReadings == null)
+                            {
+                                <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                            }
+                            else
+                            {
+                                foreach (var reading in _recentReadings)
+                                {
+                                    <tr>
+                                        <td>@reading.Timestamp.ToString("HH:mm:ss")</td>
+                                        <td>@reading.Asset?.Name</td>
+                                        <td class="@(reading.ValueKw >= 0 ? "text-success" : "text-danger")">
+                                            @reading.ValueKw.ToString("N2")
+                                        </td>
+                                        <td>
+                                            <span class="badge @(reading.ValueKw >= 0 ? "bg-success" : "bg-warning")">
+                                                @(reading.ValueKw >= 0 ? "Supplying" : "Consuming")
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private double _production;
+    private double _consumption;
+    private double _efficiency;
+    private EnergyAsset? _topConsumer;
+    private List<EnergyReading>? _recentReadings;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _production = await StatsService.GetTotalProductionTodayAsync();
+        _consumption = await StatsService.GetTotalConsumptionTodayAsync();
+        _efficiency = await StatsService.GetEfficiencyScoreAsync();
+        _topConsumer = await StatsService.GetTopConsumerAsync();
+        _recentReadings = await StatsService.GetRecentReadingsAsync(5);
+    }
+}

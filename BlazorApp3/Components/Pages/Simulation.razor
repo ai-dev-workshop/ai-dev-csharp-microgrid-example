@@ -1,0 +1,115 @@
+@page "/simulation"
+@using BlazorApp3.Services
+@using BlazorApp3.Data.Models
+@inject IStatsService StatsService
+@rendermode InteractiveServer
+
+<PageTitle>EcoGrid Simulator</PageTitle>
+
+<div class="container mt-4">
+    <div class="jumbotron bg-light p-5 rounded-3 border">
+        <h1 class="display-4">Time Simulator</h1>
+        <p class="lead">Advance the microgrid timeline by 1 hour to see how the system responds to environmental changes and load fluctuations.</p>
+        <hr class="my-4">
+        
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-primary btn-lg" @onclick="RunSimulation" disabled="@_isSimulating">
+                @if (_isSimulating)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span> Simulating...</span>
+                }
+                else
+                {
+                    <span class="bi bi-play-fill"></span>
+                    <span> Simulate 1 Hour</span>
+                }
+            </button>
+            
+            @if (_lastSimulatedTime.HasValue)
+            {
+                <span class="text-success animate-fade-in">
+                    <span class="bi bi-check-circle-fill"></span>
+                    Last simulation: @_lastSimulatedTime.Value.ToString("HH:mm:ss")
+                </span>
+            }
+        </div>
+    </div>
+
+    <div class="mt-5">
+        <h4>Recent Simulation History</h4>
+        <div class="card shadow-sm mt-3">
+            <div class="card-body p-0">
+                <table class="table table-striped mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Time</th>
+                            <th>Total Production (kW)</th>
+                            <th>Total Consumption (kW)</th>
+                            <th>Net Flow</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (_history == null || !_history.Any())
+                        {
+                            <tr><td colspan="4" class="text-center py-4">No recent simulation data. Click the button above!</td></tr>
+                        }
+                        else
+                        {
+                            foreach (var item in _history)
+                            {
+                                <tr>
+                                    <td>@item.Time.ToString("HH:mm:ss")</td>
+                                    <td class="text-success">+@item.Prod.ToString("N2")</td>
+                                    <td class="text-danger">-@item.Cons.ToString("N2")</td>
+                                    <td class="fw-bold @(item.Net >= 0 ? "text-success" : "text-danger")">
+                                        @item.Net.ToString("N2") kW
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _isSimulating = false;
+    private DateTime? _lastSimulatedTime;
+    private List<SimLog> _history = new();
+
+    private async Task RunSimulation()
+    {
+        _isSimulating = true;
+        
+        // Simulate processing time for UX
+        await Task.Delay(800);
+        
+        await StatsService.SimulateHourAsync();
+        
+        var prod = await StatsService.GetTotalProductionTodayAsync();
+        var cons = await StatsService.GetTotalConsumptionTodayAsync();
+        
+        _history.Insert(0, new SimLog { 
+            Time = DateTime.UtcNow, 
+            Prod = prod, 
+            Cons = cons, 
+            Net = prod - cons 
+        });
+        
+        if (_history.Count > 10) _history.RemoveAt(10);
+        
+        _lastSimulatedTime = DateTime.UtcNow;
+        _isSimulating = false;
+    }
+
+    private class SimLog
+    {
+        public DateTime Time { get; set; }
+        public double Prod { get; set; }
+        public double Cons { get; set; }
+        public double Net { get; set; }
+    }
+}

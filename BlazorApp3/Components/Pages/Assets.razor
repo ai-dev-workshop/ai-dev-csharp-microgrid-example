@@ -1,0 +1,165 @@
+@page "/assets"
+@using BlazorApp3.Services
+@using BlazorApp3.Data.Models
+@using BlazorApp3.Data.Enums
+@inject IAssetService AssetService
+@rendermode InteractiveServer
+
+<PageTitle>Manage Assets</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Energy Assets</h2>
+        <button class="btn btn-primary" @onclick="ShowAddForm">
+            <span class="bi bi-plus-lg"></span> Add New Asset
+        </button>
+    </div>
+
+    @if (_isFormVisible)
+    {
+        <div class="card mb-4 shadow-sm border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">@(_editingAsset.Id == 0 ? "Add New Asset" : $"Edit {_editingAsset.Name}")</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="_editingAsset" OnValidSubmit="SaveAsset" FormName="AssetForm">
+                    <DataAnnotationsValidator />
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Asset Name</label>
+                            <InputText class="form-control" @bind-Value="_editingAsset.Name" />
+                            <ValidationMessage For="@(() => _editingAsset.Name)" class="text-danger" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Type</label>
+                            <InputSelect class="form-select" @bind-Value="_editingAsset.Type">
+                                @foreach (var type in Enum.GetValues<AssetType>())
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Max Capacity (kW)</label>
+                            <InputNumber class="form-control" @bind-Value="_editingAsset.MaxCapacityKw" />
+                            <ValidationMessage For="@(() => _editingAsset.MaxCapacityKw)" class="text-danger" />
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <InputCheckbox class="form-check-input" @bind-Value="_editingAsset.IsActive" id="isActive" />
+                                <label class="form-check-label" for="isActive">Active</label>
+                            </div>
+                        </div>
+                        <div class="col-12 mt-3">
+                            <button type="submit" class="btn btn-success me-2">Save Asset</button>
+                            <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Capacity</th>
+                        <th>Status</th>
+                        <th class="text-end px-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_assets == null)
+                    {
+                        <tr><td colspan="5" class="text-center">Loading assets...</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var asset in _assets)
+                        {
+                            <tr>
+                                <td><strong>@asset.Name</strong></td>
+                                <td>@asset.Type</td>
+                                <td>@asset.MaxCapacityKw kW</td>
+                                <td>
+                                    <span class="badge @(asset.IsActive ? "bg-success" : "bg-danger")">
+                                        @(asset.IsActive ? "Active" : "Maintenance")
+                                    </span>
+                                </td>
+                                <td class="text-end px-4">
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditAsset(asset)">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsset(asset.Id)">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<EnergyAsset>? _assets;
+    private bool _isFormVisible = false;
+    private EnergyAsset _editingAsset = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAssets();
+    }
+
+    private async Task LoadAssets()
+    {
+        _assets = await AssetService.GetAllAssetsAsync();
+    }
+
+    private void ShowAddForm()
+    {
+        _editingAsset = new EnergyAsset { Type = AssetType.Solar, MaxCapacityKw = 1.0, IsActive = true };
+        _isFormVisible = true;
+    }
+
+    private void EditAsset(EnergyAsset asset)
+    {
+        _editingAsset = new EnergyAsset 
+        { 
+            Id = asset.Id, 
+            Name = asset.Name, 
+            Type = asset.Type, 
+            MaxCapacityKw = asset.MaxCapacityKw, 
+            IsActive = asset.IsActive 
+        };
+        _isFormVisible = true;
+    }
+
+    private async Task SaveAsset()
+    {
+        if (_editingAsset.Id == 0)
+            await AssetService.AddAssetAsync(_editingAsset);
+        else
+            await AssetService.UpdateAssetAsync(_editingAsset);
+
+        _isFormVisible = false;
+        await LoadAssets();
+    }
+
+    private async Task DeleteAsset(int id)
+    {
+        await AssetService.DeleteAssetAsync(id);
+        await LoadAssets();
+    }
+
+    private void CancelEdit()
+    {
+        _isFormVisible = false;
+    }
+}
