@@ -1,0 +1,199 @@
+@page "/market"
+@using BlazorApp3.Data.Models
+@using BlazorApp3.Services
+@using BlazorApp3.Data.Enums
+@inject IEnergyTradingService TradingService
+@rendermode InteractiveServer
+
+<PageTitle>Community Energy Market</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-5">Energy Market</h1>
+            <p class="lead text-muted">Peer-to-peer energy trading within the community.</p>
+        </div>
+        <div class="col-auto d-flex align-items-center">
+            <button class="btn btn-primary" @onclick="RunTradingCycle">
+                <i class="bi bi-play-circle me-1"></i> Run Trading Cycle (Simulation)
+            </button>
+        </div>
+    </div>
+
+    @if (summary != null)
+    {
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card bg-success text-white border-0 shadow-sm">
+                    <div class="card-body text-center py-4">
+                        <h6 class="card-title text-uppercase mb-2" style="opacity: 0.8;">Traded Today (Internal)</h6>
+                        <h2 class="display-5 fw-bold mb-0">@summary.TotalEnergyTradedToday.ToString("N2") kWh</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white border-0 shadow-sm">
+                    <div class="card-body text-center py-4">
+                        <h6 class="card-title text-uppercase mb-2" style="opacity: 0.8;">Avg. Internal Price</h6>
+                        <h2 class="display-5 fw-bold mb-0">$@summary.AveragePricePerKwh.ToString("N2")</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card @(summary.GridDependencyPercentage > 50 ? "bg-warning" : "bg-primary") text-white border-0 shadow-sm">
+                    <div class="card-body text-center py-4">
+                        <h6 class="card-title text-uppercase mb-2" style="opacity: 0.8;">Grid Dependency</h6>
+                        <h2 class="display-5 fw-bold mb-0">@summary.GridDependencyPercentage.ToString("N1")%</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white py-3 border-bottom-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold">Active Market Offers</h5>
+                        <span class="badge bg-light text-dark text-uppercase">Live</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Asset</th>
+                                    <th>Type</th>
+                                    <th>Quantity</th>
+                                    <th>Price</th>
+                                    <th class="pe-4">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var offer in activeOffers)
+                                {
+                                    <tr>
+                                        <td class="ps-4">
+                                            <div class="fw-bold">@offer.Asset?.Name</div>
+                                            @if (offer.Asset?.Type == AssetType.Battery)
+                                            {
+                                                <span class="badge bg-info-subtle text-info small">Battery Storage</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge @(offer.TradeType == TradeType.Sell ? "bg-success" : "bg-danger") rounded-pill px-3">
+                                                @offer.TradeType.ToString().ToUpper()
+                                            </span>
+                                        </td>
+                                        <td class="text-nowrap">@offer.AvailableKwh.ToString("N2") kWh</td>
+                                        <td class="fw-bold text-primary">$@offer.PricePerKwh.ToString("N2")</td>
+                                        <td class="pe-4 small text-muted">@offer.CreatedAt.ToShortTimeString()</td>
+                                    </tr>
+                                }
+                                @if (!activeOffers.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center py-5 text-muted">
+                                            <i class="bi bi-inbox display-4 d-block mb-3"></i>
+                                            No active offers. Click simulation to generate.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white py-3 border-bottom-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold">Recent Trade History</h5>
+                        <span class="badge bg-light text-dark text-uppercase">History</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Seller ? Buyer</th>
+                                    <th>Volume</th>
+                                    <th>Total</th>
+                                    <th class="pe-4">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var tx in recentTransactions)
+                                {
+                                    <tr>
+                                        <td class="ps-4">
+                                            <div class="d-flex align-items-center">
+                                                @if (tx.SellerAsset?.Type == AssetType.Grid)
+                                                {
+                                                    <span class="badge bg-warning text-dark me-2">GRID</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-success small me-2"><i class="bi bi-arrow-up-circle"></i></span>
+                                                    <span>@tx.SellerAsset?.Name</span>
+                                                }
+                                                <i class="bi bi-arrow-right mx-2 text-muted"></i>
+                                                <span class="text-danger small me-2"><i class="bi bi-arrow-down-circle"></i></span>
+                                                <span>@tx.BuyerAsset?.Name</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-nowrap">@tx.TradedKwh.ToString("N2") kWh</td>
+                                        <td class="fw-bold text-success">$@tx.TotalPrice.ToString("N2")</td>
+                                        <td class="pe-4 small text-muted">@tx.Timestamp.ToShortTimeString()</td>
+                                    </tr>
+                                }
+                                @if (!recentTransactions.Any())
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center py-5 text-muted">
+                                            <i class="bi bi-clock-history display-4 d-block mb-3"></i>
+                                            No recent transactions.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private MarketSummary? summary;
+    private List<EnergyTradeOffer> activeOffers = new();
+    private List<EnergyTradeTransaction> recentTransactions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        summary = await TradingService.GetMarketSummaryAsync();
+        activeOffers = await TradingService.GetActiveOffersAsync();
+        recentTransactions = await TradingService.GetTradeHistoryAsync(10);
+    }
+
+    private async Task RunTradingCycle()
+    {
+        // Use current hour for simulation
+        var now = DateTime.UtcNow;
+        var simulationTime = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc);
+        
+        await TradingService.GenerateTradeOffersAsync(simulationTime);
+        await TradingService.ExecuteTradingCycleAsync(simulationTime);
+        await LoadData();
+    }
+}

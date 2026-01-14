@@ -36,3 +36,19 @@ public interface ILoadOptimizationService
     bool IsOptimizationApplied { get; }
     void ToggleOptimization(bool apply);
 }
+
+public interface IEnergyTradingService
+{
+    Task GenerateTradeOffersAsync(DateTime timestamp);
+    Task ExecuteTradingCycleAsync(DateTime timestamp);
+    Task<MarketSummary> GetMarketSummaryAsync();
+    Task<List<EnergyTradeOffer>> GetActiveOffersAsync();
+    Task<List<EnergyTradeTransaction>> GetTradeHistoryAsync(int take = 50);
+}
+
+public class MarketSummary
+{
+    public double TotalEnergyTradedToday { get; set; }
+    public double AveragePricePerKwh { get; set; }
+    public double GridDependencyPercentage { get; set; }
+}

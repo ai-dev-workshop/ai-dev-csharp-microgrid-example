@@ -1,0 +1,188 @@
+﻿Act as a Senior .NET Architect and Lead Developer. This is **Step 3** of the "EcoGrid Manager" application.
+
+You are extending an existing Clean Architecture Blazor Server solution built with:
+- .NET 10
+- ASP.NET Core Blazor Server
+- EF Core (Code-First)
+- SQLite
+- Bootstrap 5 UI
+- No authentication or authorization
+
+This step introduces a **Community Energy Trading (Peer-to-Peer) module** that allows assets within the eco-village to trade energy internally before falling back to the main grid.
+
+The system must remain **production-ready**, strictly typed, SOLID-compliant, and follow Clean Architecture boundaries.
+
+---
+
+## Context Recap (Must Be Preserved)
+
+EcoGrid Manager currently supports:
+- Energy assets (Producers, Consumers, Batteries)
+- Historical readings (kW, kWh)
+- Forecasting and surplus/deficit detection
+- Smart load shifting and optimization (Step 2)
+
+DO NOT remove or refactor existing functionality unless strictly required.
+This is an **extension**, not a rewrite.
+
+---
+
+## New Feature: Community Energy Trading (P2P Microgrid Market)
+
+### Core Idea
+
+The eco-village operates an **internal energy market**:
+- Assets with surplus energy can **sell**
+- Assets with deficit can **buy**
+- The system automatically matches buyers and sellers
+- Grid usage is the **last resort**
+
+This is a **rule-based internal market**, not blockchain-based.
+
+---
+
+## Functional Requirements
+
+### 1. New Domain Models
+
+Add the following models:
+
+#### `EnergyTradeOffer`
+Represents an intent to buy or sell energy.
+- Id
+- AssetId
+- TradeType (Enum: Sell, Buy)
+- AvailableKwh
+- PricePerKwh
+- CreatedAt
+- IsActive
+
+#### `EnergyTradeTransaction`
+Represents a completed trade.
+- Id
+- SellerAssetId
+- BuyerAssetId
+- TradedKwh
+- PricePerKwh
+- TotalPrice
+- Timestamp
+
+#### `EnergyWallet`
+Tracks internal credits.
+- AssetId
+- CreditBalance
+- LastUpdated
+
+---
+
+### 2. Trading Rules
+
+- Renewable producers get **priority** as sellers
+- Batteries can act as both buyers and sellers
+- Trades are matched by:
+  1. Price (cheapest seller first)
+  2. Timestamp (FIFO)
+- Partial trades are allowed
+- If demand remains unmet → fallback to Grid
+- Grid trades are recorded but flagged as `External`
+
+---
+
+### 3. Trading Engine (Service Layer)
+
+Create a new service:
+
+#### `IEnergyTradingService`
+Methods:
+- `GenerateTradeOffersAsync(DateTime timestamp)`
+- `ExecuteTradingCycleAsync(DateTime timestamp)`
+- `GetMarketSummaryAsync()`
+- `GetTradeHistoryAsync(int take = 50)`
+
+Responsibilities:
+- Convert forecasted surplus/deficit into buy/sell offers
+- Match offers into transactions
+- Update:
+  - EnergyWallet balances
+  - Remaining offers
+  - Asset energy balance
+
+---
+
+### 4. Database Layer
+
+Extend `AppDbContext`:
+- DbSet\<EnergyTradeOffer\>
+- DbSet\<EnergyTradeTransaction\>
+- DbSet\<EnergyWallet\>
+
+Seeding requirements:
+- Initialize wallets for all assets
+- Assign initial credit balances
+- Create sample trades for demo purposes
+
+---
+
+### 5. UI (Blazor Components)
+
+#### New Page: **Energy Market**
+
+Create:
+- `Market.razor`
+
+UI requirements (Bootstrap 5 only):
+- Market summary cards:
+  - Total Energy Traded Today
+  - Average Internal Price per kWh
+  - Grid Dependency %
+- Two tables:
+  - Active Buy/Sell Offers
+  - Recent Transactions
+- Color rules:
+  - Green → Sell offers
+  - Red → Buy offers
+  - Blue badge → Battery
+  - Yellow badge → Grid
+- Button:
+  - **"Run Trading Cycle (Simulation)"**
+
+---
+
+### 6. Simulation Behavior
+
+When "Run Trading Cycle" is clicked:
+- Execute one market-clearing cycle
+- Create transactions
+- Update wallets
+- Reduce grid usage where possible
+- Refresh dashboard KPIs
+
+This is a **simulation-only market**, no real payments or external APIs.
+
+---
+
+## Non-Functional Requirements
+
+- Clean Architecture separation:
+  - Domain
+  - Application Services
+  - Infrastructure (EF Core)
+  - UI (Blazor)
+- No third-party market or finance libraries
+- No JavaScript frameworks
+- Strong typing everywhere
+- Deterministic logic (no randomness in trading)
+- Code must be readable and extensible
+
+---
+
+## Output Requirements
+
+- New domain models and enums
+- Updated DbContext and seed logic
+- Trading service + interface
+- Market matching logic
+- `Market.razor` UI component
+- Any required DTOs or helper classes
+
+The final result should make EcoGrid Manager feel like a **self-balancing, community-driven energy ecosystem**, not just a monitoring or forecasting tool.

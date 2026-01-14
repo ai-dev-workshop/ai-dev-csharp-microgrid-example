@@ -74,32 +74,68 @@ public static class DbInitializer
         context.FlexibleLoadProfiles.AddRange(flexibleProfiles);
         await context.SaveChangesAsync();
 
-        // Seed initial 24-hour forecast
-        var forecastDate = DateTime.UtcNow.Date.AddDays(1);
+        // Seed initial 24-hour forecast (today and tomorrow)
         var forecasts = new List<EnergyForecast>();
-        foreach (var asset in assets)
-        {
-            for (int h = 0; h < 24; h++)
-            {
-                var timestamp = forecastDate.AddHours(h);
-                // Simple average of historical data (last 7 days at same hour)
-                var historicalReadings = readings
-                    .Where(r => r.AssetId == asset.Id && r.Timestamp.Hour == h)
-                    .Select(r => r.ValueKw)
-                    .ToList();
-                
-                double avgValue = historicalReadings.Any() ? historicalReadings.Average() : 0;
+        var datesToForecast = new[] { DateTime.UtcNow.Date, DateTime.UtcNow.Date.AddDays(1) };
 
-                forecasts.Add(new EnergyForecast
+        foreach (var date in datesToForecast)
+        {
+            foreach (var asset in assets)
+            {
+                for (int h = 0; h < 24; h++)
                 {
-                    AssetId = asset.Id,
-                    ForecastTimestamp = timestamp,
-                    ExpectedKw = avgValue,
-                    ConfidenceLevel = ConfidenceLevel.Medium
-                });
+                    var timestamp = date.AddHours(h);
+                    // Simple average of historical data (last 7 days at same hour)
+                    var historicalReadings = readings
+                        .Where(r => r.AssetId == asset.Id && r.Timestamp.Hour == h)
+                        .Select(r => r.ValueKw)
+                        .ToList();
+                    
+                    double avgValue = historicalReadings.Any() ? historicalReadings.Average() : 0;
+
+                    forecasts.Add(new EnergyForecast
+                    {
+                        AssetId = asset.Id,
+                        ForecastTimestamp = timestamp,
+                        ExpectedKw = avgValue,
+                        ConfidenceLevel = ConfidenceLevel.Medium
+                    });
+                }
             }
         }
         context.Forecasts.AddRange(forecasts);
+        await context.SaveChangesAsync();
+
+        // Seed wallets for all assets
+        var wallets = assets.Select(a => new EnergyWallet
+        {
+            AssetId = a.Id,
+            CreditBalance = 100.0 // Everyone starts with 100 credits
+        }).ToList();
+        context.Wallets.AddRange(wallets);
+        await context.SaveChangesAsync();
+
+        // Seed a few sample trade offers
+        var sampleOffers = new List<EnergyTradeOffer>
+        {
+            new EnergyTradeOffer 
+            { 
+                AssetId = assets.First(a => a.Type == AssetType.Solar).Id, 
+                TradeType = TradeType.Sell, 
+                AvailableKwh = 5.0, 
+                PricePerKwh = 0.15,
+                IsActive = true
+            },
+            new EnergyTradeOffer 
+            { 
+                AssetId = assets.First(a => a.Type == AssetType.Household).Id, 
+                TradeType = TradeType.Buy, 
+                AvailableKwh = 2.0, 
+                PricePerKwh = 0.25,
+                IsActive = true
+            }
+        };
+        context.TradeOffers.AddRange(sampleOffers);
         await context.SaveChangesAsync();
     }
 

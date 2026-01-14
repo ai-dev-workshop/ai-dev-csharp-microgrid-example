@@ -18,6 +18,7 @@ builder.Services.AddScoped<IAssetService, AssetService>();
 builder.Services.AddScoped<IEnergyForecastService, ForecastService>();
 builder.Services.AddScoped<ILoadOptimizationService, OptimizationService>();
 builder.Services.AddScoped<IStatsService, StatsService>();
+builder.Services.AddScoped<IEnergyTradingService, TradingService>();
 
 var app = builder.Build();
 
