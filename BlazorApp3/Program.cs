@@ -15,6 +15,8 @@ builder.Services.AddDbContextFactory<AppDbContext>(options =>
 
 // Add Application Services
 builder.Services.AddScoped<IAssetService, AssetService>();
+builder.Services.AddScoped<IEnergyForecastService, ForecastService>();
+builder.Services.AddScoped<ILoadOptimizationService, OptimizationService>();
 builder.Services.AddScoped<IStatsService, StatsService>();
 
 var app = builder.Build();

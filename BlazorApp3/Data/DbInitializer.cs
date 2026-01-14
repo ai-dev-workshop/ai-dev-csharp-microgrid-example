@@ -53,6 +53,54 @@ public static class DbInitializer
 
         context.Readings.AddRange(readings);
         await context.SaveChangesAsync();
+
+        // Seed flexible load profiles
+        var flexibleProfiles = new List<FlexibleLoadProfile>();
+        foreach (var asset in assets)
+        {
+            if (asset.Type == AssetType.Battery || asset.Name.Contains("Wallbox"))
+            {
+                flexibleProfiles.Add(new FlexibleLoadProfile
+                {
+                    AssetId = asset.Id,
+                    MinKw = -asset.MaxCapacityKw,
+                    MaxKw = asset.MaxCapacityKw,
+                    IsShiftable = true,
+                    PreferredStartHour = 22,
+                    PreferredEndHour = 6
+                });
+            }
+        }
+        context.FlexibleLoadProfiles.AddRange(flexibleProfiles);
+        await context.SaveChangesAsync();
+
+        // Seed initial 24-hour forecast
+        var forecastDate = DateTime.UtcNow.Date.AddDays(1);
+        var forecasts = new List<EnergyForecast>();
+        foreach (var asset in assets)
+        {
+            for (int h = 0; h < 24; h++)
+            {
+                var timestamp = forecastDate.AddHours(h);
+                // Simple average of historical data (last 7 days at same hour)
+                var historicalReadings = readings
+                    .Where(r => r.AssetId == asset.Id && r.Timestamp.Hour == h)
+                    .Select(r => r.ValueKw)
+                    .ToList();
+                
+                double avgValue = historicalReadings.Any() ? historicalReadings.Average() : 0;
+
+                forecasts.Add(new EnergyForecast
+                {
+                    AssetId = asset.Id,
+                    ForecastTimestamp = timestamp,
+                    ExpectedKw = avgValue,
+                    ConfidenceLevel = ConfidenceLevel.Medium
+                });
+            }
+        }
+        context.Forecasts.AddRange(forecasts);
+        await context.SaveChangesAsync();
     }
 
     private static double GenerateRealisticValue(EnergyAsset asset, DateTime time, Random random)

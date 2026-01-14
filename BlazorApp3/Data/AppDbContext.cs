@@ -11,6 +11,8 @@ public class AppDbContext : DbContext
 
     public DbSet<EnergyAsset> Assets => Set<EnergyAsset>();
     public DbSet<EnergyReading> Readings => Set<EnergyReading>();
+    public DbSet<EnergyForecast> Forecasts => Set<EnergyForecast>();
+    public DbSet<FlexibleLoadProfile> FlexibleLoadProfiles => Set<FlexibleLoadProfile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,6 +20,10 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<EnergyAsset>()
             .Property(e => e.Type)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<EnergyForecast>()
+            .Property(e => e.ConfidenceLevel)
             .HasConversion<string>();
     }
 }

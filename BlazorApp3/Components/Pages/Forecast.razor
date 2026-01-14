@@ -1,0 +1,187 @@
+@page "/forecast"
+@using BlazorApp3.Data.Models
+@using BlazorApp3.Services
+@using BlazorApp3.Data.Enums
+@inject IEnergyForecastService ForecastService
+@inject ILoadOptimizationService OptimizationService
+
+<PageTitle>Smart Forecasting & Optimization</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-5">Energy Forecasting</h1>
+            <p class="lead text-muted">24-hour predictive analysis and load optimization.</p>
+        </div>
+        <div class="col-auto d-flex align-items-center">
+            <button class="btn btn-outline-primary me-2" @onclick="RecalculateForecast">
+                <i class="bi bi-arrow-clockwise"></i> Recalculate Forecast
+            </button>
+            <button class="btn @(OptimizationService.IsOptimizationApplied ? "btn-success" : "btn-primary")" @onclick="ApplyOptimization">
+                <i class="bi bi-cpu"></i> @(OptimizationService.IsOptimizationApplied ? "Optimization Applied" : "Apply Load Optimization")
+            </button>
+        </div>
+    </div>
+
+    @if (recommendations.Any())
+    {
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Smart Recommendations</h5>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var rec in recommendations)
+                        {
+                            <div class="alert alert-success d-flex align-items-center" role="alert">
+                                <i class="bi bi-info-circle-fill me-2"></i>
+                                <div>
+                                    <strong>@rec.AssetName:</strong> Shift usage from <code>@rec.OriginalTimeWindow</code> to <strong>@rec.OptimizedTimeWindow</strong>. 
+                                    <span class="badge bg-success ms-2">Est. Savings: @rec.ExpectedSavingsKwh.ToString("N2") kWh</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">24-Hour Forecast</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Forecasted Production</th>
+                                    <th>Forecasted Consumption</th>
+                                    <th>Net Balance</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in forecastSummaries)
+                                {
+                                    var rowClass = item.NetBalance > 0 ? "table-success-light" : (item.NetBalance < -5 ? "table-danger-light" : "");
+                                    <tr style="@(item.NetBalance > 0 ? "background-color: #f0fff4;" : (item.NetBalance < -5 ? "background-color: #fff5f5;" : ""))">
+                                        <td>@item.Hour.ToString("HH:00")</td>
+                                        <td class="text-success">+@item.TotalProduction.ToString("N2") kW</td>
+                                        <td class="text-danger">@item.TotalConsumption.ToString("N2") kW</td>
+                                        <td>
+                                            <span class="fw-bold @(item.NetBalance >= 0 ? "text-success" : "text-danger")">
+                                                @(item.NetBalance >= 0 ? "+" : "")@item.NetBalance.ToString("N2") kW
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge @GetConfidenceBadgeClass(item.Hour)">
+                                                @GetConfidenceLevel(item.Hour)
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Surplus/Deficit Windows</h5>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var window in windows)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>@window.StartTime.ToString("HH:00") - @window.EndTime.ToString("HH:00")</strong>
+                                    <br />
+                                    <small class="text-muted">@(window.IsSurplus ? "Surplus Period" : "Deficit Period")</small>
+                                </div>
+                                <span class="badge @(window.IsSurplus ? "bg-success" : "bg-danger") pill">
+                                    @(window.IsSurplus ? "+" : "")@window.TotalNetKw.ToString("N1") kW
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+
+            @if (OptimizationService.IsOptimizationApplied)
+            {
+                <div class="card bg-success text-white shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">Projected Impact</h5>
+                        <p class="card-text">
+                            <i class="bi bi-check-circle-fill"></i> Load shifting active.
+                            <br />
+                            <small>Estimated grid dependency reduction: <strong>15-20%</strong></small>
+                            <br />
+                            <small>Projected renewable self-consumption: <strong>+12%</strong></small>
+                        </p>
+                        <button class="btn btn-sm btn-light" @onclick="() => OptimizationService.ToggleOptimization(false)">
+                            Disable Optimization
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ForecastSummary> forecastSummaries = new();
+    private List<SurplusDeficitWindow> windows = new();
+    private List<OptimizationRecommendation> recommendations = new();
+    private List<EnergyForecast> rawForecasts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        forecastSummaries = await ForecastService.GetForecastSummaryAsync();
+        windows = await ForecastService.GetSurplusDeficitWindowsAsync();
+        recommendations = await OptimizationService.GetRecommendationsAsync();
+        rawForecasts = await ForecastService.GetForecastAsync();
+    }
+
+    private async Task RecalculateForecast()
+    {
+        await ForecastService.Generate24HourForecastAsync(DateTime.UtcNow);
+        await LoadData();
+    }
+
+    private async Task ApplyOptimization()
+    {
+        await OptimizationService.ApplyOptimizationAsync();
+        // In a real app we might recalculate the forecast based on shifts, 
+        // but here we just toggle the simulation flag.
+        StateHasChanged();
+    }
+
+    private string GetConfidenceBadgeClass(DateTime hour)
+    {
+        var level = GetConfidenceLevel(hour);
+        return level switch
+        {
+            ConfidenceLevel.High => "bg-success",
+            ConfidenceLevel.Medium => "bg-warning text-dark",
+            ConfidenceLevel.Low => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private ConfidenceLevel GetConfidenceLevel(DateTime hour)
+    {
+        return rawForecasts.FirstOrDefault(f => f.ForecastTimestamp == hour)?.ConfidenceLevel ?? ConfidenceLevel.Medium;
+    }
+}

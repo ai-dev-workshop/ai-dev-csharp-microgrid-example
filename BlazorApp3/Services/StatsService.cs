@@ -8,10 +8,12 @@ namespace BlazorApp3.Services;
 public class StatsService : IStatsService
 {
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
+    private readonly ILoadOptimizationService _optimizationService;
 
-    public StatsService(IDbContextFactory<AppDbContext> contextFactory)
+    public StatsService(IDbContextFactory<AppDbContext> contextFactory, ILoadOptimizationService optimizationService)
     {
         _contextFactory = contextFactory;
+        _optimizationService = optimizationService;
     }
 
     public async Task<double> GetTotalProductionTodayAsync()
@@ -68,12 +70,33 @@ public class StatsService : IStatsService
     {
         using var context = _contextFactory.CreateDbContext();
         var assets = await context.Assets.Where(a => a.IsActive).ToListAsync();
+        var profiles = await context.FlexibleLoadProfiles.ToListAsync();
         var random = new Random();
         var now = DateTime.UtcNow;
 
         foreach (var asset in assets)
         {
             double value = GenerateRealisticValue(asset, now, random);
+
+            // Apply optimization logic if enabled
+            if (_optimizationService.IsOptimizationApplied)
+            {
+                var profile = profiles.FirstOrDefault(p => p.AssetId == asset.Id);
+                if (profile != null && profile.IsShiftable)
+                {
+                    // If it's a battery or shiftable load, reduce consumption during peak deficit
+                    // For simulation: if it's evening, reduce load; if it's noon, increase (charging during surplus)
+                    if (now.Hour >= 17 && now.Hour <= 21) // Peak evening deficit
+                    {
+                        value *= 0.5; // Reduce load/charging
+                    }
+                    else if (now.Hour >= 11 && now.Hour <= 15) // Peak solar surplus
+                    {
+                        value *= 1.5; // Increase charging/use
+                    }
+                }
+            }
+
             context.Readings.Add(new EnergyReading
             {
                 AssetId = asset.Id,

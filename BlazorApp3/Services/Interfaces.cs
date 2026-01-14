@@ -20,3 +20,19 @@ public interface IStatsService
     Task<List<EnergyReading>> GetRecentReadingsAsync(int count);
     Task SimulateHourAsync();
 }
+
+public interface IEnergyForecastService
+{
+    Task Generate24HourForecastAsync(DateTime start);
+    Task<List<EnergyForecast>> GetForecastAsync();
+    Task<List<ForecastSummary>> GetForecastSummaryAsync();
+    Task<List<SurplusDeficitWindow>> GetSurplusDeficitWindowsAsync();
+}
+
+public interface ILoadOptimizationService
+{
+    Task<List<OptimizationRecommendation>> GetRecommendationsAsync();
+    Task ApplyOptimizationAsync();
+    bool IsOptimizationApplied { get; }
+    void ToggleOptimization(bool apply);
+}
