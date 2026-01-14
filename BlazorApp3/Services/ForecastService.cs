@@ -5,13 +5,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlazorApp3.Services;
 
-public class ForecastService(AppDbContext context) : IEnergyForecastService
+public class ForecastService(IDbContextFactory<AppDbContext> contextFactory) : IEnergyForecastService
 {
     public async Task Generate24HourForecastAsync(DateTime start)
     {
+        using var context = contextFactory.CreateDbContext();
         // Clear old forecasts
         var oldForecasts = await context.Forecasts.ToListAsync();
         context.Forecasts.RemoveRange(oldForecasts);
+
 
         var assets = await context.Assets.ToListAsync();
         var sevenDaysAgo = start.AddDays(-7);
@@ -45,17 +47,21 @@ public class ForecastService(AppDbContext context) : IEnergyForecastService
 
     public async Task<List<EnergyForecast>> GetForecastAsync()
     {
+        using var context = contextFactory.CreateDbContext();
         return await context.Forecasts
             .Include(f => f.Asset)
             .OrderBy(f => f.ForecastTimestamp)
             .ToListAsync();
     }
 
+
     public async Task<List<ForecastSummary>> GetForecastSummaryAsync()
     {
+        using var context = contextFactory.CreateDbContext();
         var forecasts = await context.Forecasts
             .Include(f => f.Asset)
             .ToListAsync();
+
 
         return forecasts
             .GroupBy(f => f.ForecastTimestamp)
