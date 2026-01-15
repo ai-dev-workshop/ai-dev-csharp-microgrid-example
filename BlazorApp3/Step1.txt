@@ -1,0 +1,45 @@
+Act as a Senior .NET Architect and Lead Developer. I need you to generate a complete, production-ready source code structure for an energy management application called "EcoGrid Manager".
+
+**Tech Stack:**
+* **Framework:** .NET 10, ASP.NET Core Blazor Server.
+* **Database:** SQLite using Entity Framework Core (Code-First approach).
+* **Styling:** Standard Bootstrap 5 (Use Bootstrap classes for layout, cards, badges, and progress bars). DO NOT use MudBlazor, Radzen, or any third-party UI component libraries.
+* **Architecture:** Clean Architecture principles. Use Dependency Injection, Service Layer, and Repository Pattern.
+
+**Constraints:**
+* No Authentication/Authorization required (keep it open).
+* Strictly typed code.
+* Use Data Annotations for validation.
+* Follow SOLID principles.
+
+**Domain Context (The "Exciting" Part):**
+This app manages a local microgrid for a smart eco-village. It tracks various "Energy Assets" (e.g., Solar Arrays, Wind Turbines, Main Grid Connection, EV Chargers).
+1.  **Energy Assets:** Can be Producers (Solar) or Consumers (EV Charger, Household).
+2.  **Readings:** Historical data points tracking kWh (kilowatt-hours) and current Wattage.
+
+**Features to Implement:**
+
+1.  **Data Layer (EF Core & SQLite):**
+    * `EnergyAsset` Model: Id, Name, Type (Enum: Solar, Wind, Grid, Household, Battery), MaxCapacity (kW), IsActive.
+    * `EnergyReading` Model: Id, AssetId, Timestamp, ValueKw (power), ConsumptionKwh (energy).
+    * `AppDbContext`: Configure SQLite connection.
+    * **Seeding:** Create a static seeder method that populates the DB with realistic dummy data on startup (e.g., "North Roof Solar Panel", "Main House HVAC", "Tesla Wallbox") and generates 7 days of hourly readings so charts/stats are visible immediately.
+
+2.  **Service Layer:**
+    * `IAssetService`: CRUD operations for Assets.
+    * `IStatsService`: Methods to calculate:
+        * *Net Energy Balance* (Total Produced vs. Total Consumed today).
+        * *Efficiency Score* (Percentage of renewable usage).
+        * *Top Consumer* (Which asset used the most power).
+
+3.  **UI (Blazor Components):**
+    * **Dashboard (Home):**
+        * Use Bootstrap Cards to show high-level metrics (Total Solar Gen, Total Grid Usage).
+        * Use Bootstrap Progress Bars to visually show "Battery Level" or "Load vs Capacity".
+        * A table showing the most recent 5 readings.
+    * **Assets Page:**
+        * A detailed table listing all assets with status badges (Green for Active, Red for Maintenance).
+        * Buttons to Add/Edit/Delete assets (use standard Blazor forms or a simple modal logic).
+    * **Simulation Page:**
+        * A button to "Simulate 1 Hour". When clicked, it generates random realistic readings for all active assets and refreshes the UI.
+
