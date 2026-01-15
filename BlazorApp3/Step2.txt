@@ -1,0 +1,181 @@
+﻿Act as a Senior .NET Architect and Lead Developer. This is **Step 2** of the "EcoGrid Manager" application.  
+You are extending an existing Clean Architecture Blazor Server 10 solution.
+
+Your task is to design and implement a **Smart Energy Forecasting & Load Optimization module** for a local microgrid.
+
+The goal of this step is to make the system more intelligent: it should **predict future energy production/consumption** and **recommend or automatically shift flexible loads** (e.g., EV charging, batteries) to optimal time windows.
+
+The solution must be **production-ready**, strictly typed, and follow SOLID and Clean Architecture principles.
+
+---
+
+## Context Recap (Must Be Preserved)
+
+EcoGrid Manager manages a smart eco-village microgrid with:
+- Energy producers (Solar, Wind)
+- Energy consumers (Households, EV Chargers)
+- Storage assets (Batteries)
+- Historical readings (kW, kWh)
+
+The app already has:
+- Assets CRUD
+- Hourly readings
+- Dashboard metrics
+- Manual simulation of readings
+
+DO NOT remove or rewrite existing features.  
+You are **extending** the system.
+
+---
+
+## New Feature: Smart Forecasting & Load Shifting
+
+### Core Idea
+1. The system forecasts **energy production and consumption for the next 24 hours**
+2. Based on the forecast, it:
+   - Identifies **energy surplus / deficit periods**
+   - Suggests **optimal times to run flexible consumers**
+   - Simulates **automatic load shifting**
+
+This is NOT AI/ML-based.  
+Use **rule-based logic + historical averages**.
+
+---
+
+## Functional Requirements
+
+### 1. New Domain Models
+
+Add the following models:
+
+#### `EnergyForecast`
+- Id
+- AssetId
+- ForecastTimestamp
+- ExpectedKw
+- ConfidenceLevel (Low, Medium, High enum)
+
+#### `FlexibleLoadProfile`
+Represents assets that can shift usage.
+- Id
+- AssetId
+- MinKw
+- MaxKw
+- IsShiftable
+- PreferredStartHour
+- PreferredEndHour
+
+---
+
+### 2. Forecasting Logic (Service Layer)
+
+Create a new service:
+
+#### `IEnergyForecastService`
+Methods:
+- `Generate24HourForecastAsync(DateTime start)`
+- `GetForecastSummaryAsync()`
+- `GetSurplusDeficitWindowsAsync()`
+
+Forecasting rules:
+- Use the **average of the last 7 days for the same hour**
+- Solar only produces between 6:00–20:00
+- Wind is variable but capped by MaxCapacity
+- Grid is unlimited but marked as non-renewable
+
+---
+
+### 3. Smart Load Optimization
+
+Create a new service:
+
+#### `ILoadOptimizationService`
+Responsibilities:
+- Identify shiftable assets (EV Chargers, Batteries)
+- Match them to forecasted surplus windows
+- Generate recommendations like:
+  - "Shift EV charging to 11:00–15:00"
+  - "Charge battery during solar peak"
+
+Return a structured result:
+- AssetName
+- OriginalTimeWindow
+- OptimizedTimeWindow
+- ExpectedSavingsKwh
+
+---
+
+### 4. Database Layer
+
+- Extend `AppDbContext`
+- Add DbSets for:
+  - EnergyForecast
+  - FlexibleLoadProfile
+- Seed:
+  - Flexible load profiles for EV Chargers and Batteries
+  - One-day initial forecast on startup
+
+---
+
+### 5. UI (Blazor Components)
+
+#### New Page: **Forecast & Optimization**
+
+Create:
+- `Forecast.razor`
+
+UI requirements:
+- 24-hour forecast table (hourly rows)
+- Color-coded rows:
+  - Green → surplus
+  - Red → deficit
+- Bootstrap badges for confidence level
+- Optimization recommendations shown as:
+  - Bootstrap alerts (`alert-success`, `alert-warning`)
+- Button:
+  - **"Recalculate Forecast"**
+  - **"Apply Load Optimization (Simulation)"**
+
+---
+
+### 6. Simulation Behavior
+
+When "Apply Load Optimization" is clicked:
+- Adjust generated readings for shiftable assets
+- Update energy balance for the day
+- Visually show improvement in:
+  - Renewable usage %
+  - Grid dependency reduction
+
+This is a **simulation only**, no real scheduling engine.
+
+---
+
+## Non-Functional Requirements
+
+- Follow existing Clean Architecture boundaries
+- No external forecasting libraries
+- No JavaScript frameworks
+- Use Bootstrap 5 only
+- Services must be unit-test friendly
+- Use Data Annotations where applicable
+- Clear separation between:
+  - Forecast calculation
+  - Optimization logic
+  - UI rendering
+
+---
+
+## Output Requirements
+
+Provide full for:
+- New domain models & enums
+- Updated DbContext & Seeder
+- Forecast & Optimization services + interfaces
+- `Forecast.razor` page
+- Any required DTOs or helper classes
+
+Explain assumptions **briefly in comments only**, not prose.
+
+The final result should make EcoGrid Manager feel like a **smart, predictive energy system**, not just a monitoring dashboard.
+
